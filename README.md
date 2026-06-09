@@ -128,4 +128,3 @@ If you'd like, I can also:
 - commit the README changes and create a Git tag.
 
 Tell me which next step you'd like.
-s
