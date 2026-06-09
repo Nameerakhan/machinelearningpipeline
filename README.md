@@ -21,6 +21,19 @@ parameters so you can reproduce any experiment by re-running the pipeline.
 MLflow is used to log metrics, parameters, and model artifacts for easy
 comparison of runs and model promotion.
 
+## Pipeline Overview
+
+The end-to-end DVC pipeline (`preprocess → train → evaluate`), as visualized
+in DagsHub:
+
+<p align="center">
+  <img src="assets/pipeline.png" alt="DVC Data Pipeline (preprocess → train → evaluate)" width="750">
+</p>
+
+Each node is either a **stage** (`preprocess`, `train`, `evaluate`) or a file
+it depends on / produces — DVC-managed files (data, model) in blue and
+Git-managed files (scripts, params) in teal.
+
 ## Key Features
 
 - Reproducible pipeline stages with `dvc repro`.
@@ -120,11 +133,49 @@ datasets used comply with their licenses and privacy requirements.
 This project is provided as an example. Add an appropriate LICENSE file
 if you intend to publish or distribute the code.
 
----
+## Pipeline Stages
 
-If you'd like, I can also:
-- add a `requirements.txt` or `pyproject.toml` in `mlpipeline/`;
-- initialize or configure a DVC remote (S3/DagsHub) and add CI steps;
-- commit the README changes and create a Git tag.
+The pipeline is defined in `dvc.yaml` and runs in the order
+`preprocess → train → evaluate`. The stages were created with the following
+`dvc stage add` commands (run from the `mlpipeline/` folder):
 
-Tell me which next step you'd like.
+### 1. Preprocess
+
+Reads the raw dataset and writes the processed dataset.
+
+```bash
+dvc stage add -n preprocess \
+    -p preprocess.input,preprocess.output \
+    -d src/preprocess.py -d data/raw/data.csv \
+    -o data/processed/data.csv \
+    python src/preprocess.py
+```
+
+### 2. Train
+
+Trains a Random Forest classifier (with hyperparameter tuning), logs to
+MLflow, and saves the model.
+
+```bash
+dvc stage add -n train \
+    -p train.data,train.model,train.random_state,train.n_estimators,train.max_depth \
+    -d src/train.py -d data/processed/data.csv \
+    -o models/model.pkl \
+    python src/train.py
+```
+
+### 3. Evaluate
+
+Loads the trained model, evaluates it, and logs the test accuracy to MLflow.
+
+```bash
+dvc stage add -n evaluate \
+    -d src/evaluate.py -d models/model.pkl -d data/processed/data.csv \
+    python src/evaluate.py
+```
+
+Once the stages are defined, run the entire pipeline with:
+
+```bash
+dvc repro
+```
